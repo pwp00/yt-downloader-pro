@@ -1,5 +1,3 @@
-// File: public/script.js
-
 document.addEventListener('DOMContentLoaded', () => {
     const urlInput = document.getElementById('youtube-url');
     const downloadMp4Btn = document.getElementById('download-mp4');
@@ -21,64 +19,53 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Tampilkan loading, dan nonaktifkan tombol untuk mencegah klik ganda
         showResult(`
             <div class="spinner-border text-light" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
-            <p class="mt-2">✅ Menghubungi backend... Memulai unduhan. Mohon tunggu, proses ini bisa memakan waktu.</p>
+            <p class="mt-2">Meminta link unduhan dari server... Mohon tunggu.</p>
         `, 'alert-info');
+        downloadMp4Btn.disabled = true;
+        downloadMp3Btn.disabled = true;
 
         try {
-            // Panggil backend kita sendiri di /api/download
             const response = await fetch('/api/download', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    url: youtubeUrl,
-                    format: format,
-                }),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: youtubeUrl, format: format }),
             });
 
-            // Jika server merespons dengan error, tampilkan pesannya
+            // Logika error handling yang lebih kuat
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || 'Terjadi kesalahan di server.');
+                throw new Error(errorData.error || 'Terjadi kesalahan tidak diketahui di server.');
             }
 
-            // Karena backend mengirim file langsung, kita proses sebagai blob
-            const blob = await response.blob();
-            const downloadUrl = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.style.display = 'none';
-            a.href = downloadUrl;
+            const data = await response.json();
 
-            // Dapatkan nama file dari header
-            const contentDisposition = response.headers.get('content-disposition');
-            let filename = `download.${format}`;
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename="(.+?)"/);
-                if (filenameMatch.length > 1) {
-                    filename = filenameMatch[1];
-                }
-            }
-            a.download = filename;
+            // Tampilkan pesan sukses dan tombol download palsu yang akan memicu redirect
+            showResult(`✅ Link berhasil didapatkan! Mengunduh **${data.title}**...`, 'alert-success');
             
+            // Cara yang lebih baik untuk memicu download tanpa redirect langsung
+            const a = document.createElement('a');
+            a.href = data.downloadUrl;
+            a.download = data.title; // Browser akan menggunakan nama file ini
             document.body.appendChild(a);
             a.click();
-            window.URL.revokeObjectURL(downloadUrl);
-            a.remove();
-            
-            showResult(`Unduhan telah dimulai! Periksa folder download Anda.`, 'alert-success');
+            document.body.removeChild(a);
 
         } catch (error) {
             console.error('Fetch Error:', error);
             showResult(`Gagal: ${error.message}`, 'alert-danger');
+        } finally {
+            // Aktifkan kembali tombol setelah proses selesai (baik sukses maupun gagal)
+            downloadMp4Btn.disabled = false;
+            downloadMp3Btn.disabled = false;
         }
     }
 
     function showResult(message, type) {
-        resultDiv.innerHTML = `<div class="alert ${type} p-3">${message}</div>`;
+        resultDiv.innerHTML = `<div class="alert ${type} p-3" role="alert">${message}</div>`;
     }
 });
