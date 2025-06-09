@@ -1,4 +1,4 @@
-// Import library @distube/ytdl-core yang lebih tangguh
+// Menggunakan library yang tangguh
 const ytdl = require('@distube/ytdl-core');
 
 export default async function handler(request, response) {
@@ -7,35 +7,36 @@ export default async function handler(request, response) {
   }
 
   try {
-    const { url, format } = request.body;
+    const { url, format: fileFormat } = request.body;
 
     if (!url || !ytdl.validateURL(url)) {
       return response.status(400).json({ error: 'URL YouTube tidak valid.' });
     }
 
+    // 1. Dapatkan info lengkap video dari YouTube
     const info = await ytdl.getInfo(url);
-    const title = info.videoDetails.title;
-    
-    const sanitizedTitle = title.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '_');
-    const filename = `${sanitizedTitle}.${format}`;
+    const title = info.videoDetails.title.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '_');
 
-    response.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-
-    let options = {};
-    if (format === 'mp3') {
-      options = { quality: 'highestaudio', filter: 'audioonly' };
-      response.setHeader('Content-Type', 'audio/mpeg');
+    // 2. Pilih format unduhan yang paling sesuai
+    let downloadFormat;
+    if (fileFormat === 'mp4') {
+      downloadFormat = ytdl.chooseFormat(info.formats, { quality: 'highestvideo', filter: 'videoandaudio' });
     } else {
-      // Opsi untuk MP4, memilih format yang memiliki video dan audio
-      options = { quality: 'highestvideo', filter: (format) => format.hasVideo && format.hasAudio };
-      response.setHeader('Content-Type', 'video/mp4');
+      downloadFormat = ytdl.chooseFormat(info.formats, { quality: 'highestaudio', filter: 'audioonly' });
     }
 
-    ytdl(url, options).pipe(response);
+    if (!downloadFormat) {
+      return response.status(404).json({ error: 'Tidak ada format yang sesuai ditemukan untuk video ini.' });
+    }
+    
+    // 3. Kirim kembali URL download dan judul ke frontend
+    response.status(200).json({ 
+      downloadUrl: downloadFormat.url,
+      title: `${title}.${fileFormat}`
+    });
 
   } catch (error) {
-    // Log error yang sebenarnya di server Vercel untuk debugging
-    console.error("Error di backend:", error.message); 
-    response.status(500).json({ error: 'Gagal memproses permintaan. Mungkin video ini dilindungi atau tidak tersedia.' });
+    console.error("Error di backend:", error.message);
+    response.status(500).json({ error: 'Gagal mendapatkan info video. Mungkin video ini privat atau dibatasi umur.' });
   }
 }
