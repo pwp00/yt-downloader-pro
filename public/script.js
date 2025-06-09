@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const data = await response.json();
 
-            // Tampilkan pesan sukses dan tombol download palsu yang akan memicu redirect
+            // Tampilkan pesan sukses dan tombol download palsu yang akan memicu redirec
             showResult(`✅ Link berhasil didapatkan! Mengunduh **${data.title}**...`, 'alert-success');
             
             // Cara yang lebih baik untuk memicu download tanpa redirect langsung
